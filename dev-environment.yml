@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EC2 based SSH dev environment for VSCode Remote SSH
+Parameters:
+  Key:
+    Type: String
+    Description: The name of your amazon EC2 security key
+Resources:
+  DevEnvironmentSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: "10.0.0.0/25"
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true
+  DevEnvironmentInternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+  DevEnvironmentInternetGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      InternetGatewayId: !Ref DevEnvironmentInternetGateway
+      VpcId: !Ref VPC
+  DevEnvironmentRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+  DevEnvironmentRoute:
+    DependsOn: DevEnvironmentInternetGatewayAttachment
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref DevEnvironmentRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref DevEnvironmentInternetGateway
+  DevEnvironmentSubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref DevEnvironmentRouteTable
+      SubnetId: !Ref DevEnvironmentSubnet
+  DevEnvironmentSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allow SSH inbound and outbound traffic
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref VPC
+  DevEnvironmentInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: ami-0264425fd74a35f64
+      InstanceType: t2.micro
+      SubnetId: !Ref DevEnvironmentSubnet
+      SecurityGroupIds:
+        - !Ref DevEnvironmentSecurityGroup
+      KeyName: !Ref Key
+  DevEnvironmentEIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref DevEnvironmentInstance
+  
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties: 
+      CidrBlock: "10.0.0.0/24"
+Outputs:
+  WebsiteURL:
+    Value: !Sub '${DevEnvironmentEIP}'
+    Description: IP Address
